@@ -4,12 +4,16 @@
  */
 package flightds;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 /**
  *
  * @author sharr
  * this class is to manage all flight schedules
  */
 import java.util.HashMap;
+import java.util.List;
 
 public class FlightSchedule {
     
@@ -42,6 +46,7 @@ public class FlightSchedule {
     }
 
     // display all flight sch for the week 
+    /*
     public void listFlights() {
         if (flights.isEmpty()) {
             System.out.println("No flights scheduled for this week.");
@@ -51,5 +56,34 @@ public class FlightSchedule {
                 System.out.println(flight);
             }
         }
+    } 
+    */
+    // display all flight sch for the week as list
+    public List<Flight> listFlights()  {
+    if (flights.isEmpty()) {
+        System.out.println("No flights scheduled for this week.");
+        return new ArrayList<>();  // return empty list 
+    } else {
+
+        // sort ascending and numerical
+        List<Flight> sortFlight = new ArrayList<>(flights.values());
+        Collections.sort(sortFlight, new Comparator<Flight>() {
+            @Override
+            public int compare(Flight f1, Flight f2) {  // check numerical
+                int code1 = Integer.parseInt(f1.getFlightCode().split("-")[0].substring(2));
+                int code2 = Integer.parseInt(f2.getFlightCode().split("-")[0].substring(2));
+                return Integer.compare(code1, code2);
+            }
+        });
+
+
+        System.out.println("Flights for the week: " + week);
+
+        for (Flight flight : sortFlight) {
+            System.out.println(flight);
+        }
+        return sortFlight;  // return generated flights
+    }
+
     }
 }
