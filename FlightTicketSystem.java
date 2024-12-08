@@ -27,8 +27,16 @@ public class FlightTicketSystem {
         return schedules.get(week);
     }
 
-    // generate flights based on week
+    // generate flights based on week user input
     public List<Flight> generateFlightsForWeek(String weekStartDate, int numFlightsPerDay) {
+        
+        // check if already generated first
+        if (schedules.containsKey(weekStartDate)) {
+           
+            return schedules.get(weekStartDate).listFlights();
+            
+        } 
+
         List<Flight> flights = new ArrayList<>();
         LocalDate startDate = LocalDate.parse(weekStartDate, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
@@ -48,6 +56,7 @@ public class FlightTicketSystem {
         addSchedule(schedule);
         return flights;
     }
+
 
     // method to add schedule using week
     public void addSchedule(FlightSchedule schedule) {
