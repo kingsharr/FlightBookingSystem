@@ -17,9 +17,9 @@ import java.util.Scanner;
 
 public class Main {
 
-    // display selected flights
-    public static Flight selectFlight(List<Flight> availableFlight, String flightCode) {
-        for (Flight flight : availableFlight) {
+    // display selected flight
+    public static Flight selectFlight(List<Flight> flights, String flightCode) {
+        for (Flight flight : flights) {
             if (flight.getFlightCode().equalsIgnoreCase(flightCode)){
                 return flight;
             }
@@ -28,11 +28,12 @@ public class Main {
     }
 
     public static void flightMenu() {
-        System.out.println("\n~~\n1.  Search for Flights ");
-        System.out.println("2.  Book Flight Ticket");
-        System.out.println("3.  Cancel Ticket");
-        System.out.println("4.  View Ticket Status");
-        System.out.println("5.  Exit ");
+        System.out.println("\n~~\n1.  View All Flights ");
+        System.out.println("2.  Search for Flights ");
+        System.out.println("3.  Book Flight Ticket");
+        System.out.println("4.  Cancel Ticket");
+        System.out.println("5.  View Ticket Status");
+        System.out.println("6.  Exit ");
         System.out.println("Select an option: ");
     }
 
@@ -44,7 +45,7 @@ public class Main {
         String weekStartDate = null;
         List<Flight> availableFlights = null;
         
-        // start system until user select 5
+        // start system until user select 6
         System.out.println("~~~~~~~~ Welcome To XYZ Flight Ticket System ~~~~~~~~");
 
         while (true) {
@@ -55,137 +56,88 @@ public class Main {
             scanner.nextLine();
 
             switch (choice) {
-                case 1:     // search for flight by week
-                    // User inputs the week start date
-                    System.out.println("Enter the start date of the week (yyyy-MM-dd): ");
+                case 1:
+                    // view csv all flights
+                    ticketSystem.loadFlightData("flightds/FlightData.csv", true);
+                    break;
+
+                case 2:     
+                    // search for flight by week
+
+                    // check if data loaded 
+                    if (ticketSystem.getFlights().isEmpty()) {
+                        ticketSystem.loadFlightData("flightds/FlightData.csv", false);
+                    } 
+
+                    // user input specific date of week to search
+                    System.out.println("Enter date of the week (yyyy-MM-dd): ");
                     
                     // check date format accuracyy
                     while (true) {
-                        weekStartDate = scanner.nextLine();
-
+                        weekStartDate = scanner.nextLine().trim();
                         try {
                             LocalDate.parse(weekStartDate, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                            // search flight method
+                            ticketSystem.searchFlights(weekStartDate);
                             break;
                         } catch (Exception e) {
                             System.out.println("Invalid date format!! Try again!!");
                         }
                     }
 
-                    // check if flights generated or not yet
-                    if (availableFlights == null || availableFlights.isEmpty()) {
-                        
-                        // if no flights generated yet, generate
-                        availableFlights = ticketSystem.generateFlightsForWeek(weekStartDate, 3); // 3 flights per day
-
-                        // Display flights to the user
-                        if (availableFlights !=null && !availableFlights.isEmpty()) {
-                            System.out.println("\nAvailable Flights for the week starting " + weekStartDate + ":");
-                            for (Flight flight : availableFlights) {
-                                System.out.println(flight);
-                            }
-                        } else {
-                            System.out.println("No available flights for selected week");
-                        }
-
-                    } else {
-                        // flights for the week already generated 
-                        System.out.println("\nAvailable Flights for the week starting " + weekStartDate + ":");
-                        for (Flight flight : availableFlights) {
-                            System.out.println(flight);
-                        }
-                    }
-
+                    
                     break;
                 
-                case 2:     // book ticket
+                case 3:     
+                    // book ticket
 
-                // see if flights have been generated or yet first
-                    if (availableFlights != null){
-                        // User selects a flight
-                        System.out.println("\nChoose a flight code to book a ticket:");
-                        String flightCode = scanner.nextLine();
+                    // check if data loaded 
+                    if (ticketSystem.getFlights().isEmpty()) {
+                        ticketSystem.loadFlightData("flightds/FlightData.csv", false);
+                    } 
 
-                        // select the flight
-                        Flight selectedFlight = selectFlight(availableFlights, flightCode);
+                    // User selects a flight
+                    System.out.println("\nEnter a flight code to book a ticket:");
+                    String flightCode = scanner.nextLine();
 
-                        if (selectedFlight != null && !availableFlights.isEmpty()) {
-                            // User provides passenger details
-                            System.out.println("Enter your name: ");
-                            String passengerName = scanner.nextLine();
-                            System.out.println("Enter your passenger ID: ");
-                            String passengerId = scanner.nextLine();
+                    // select the flight
+                    Flight selectedFlight = selectFlight(ticketSystem.getFlights(), flightCode);
 
-                            // pass to method
-                            ticketSystem.bookTicket(weekStartDate, flightCode, passengerName, passengerId);
+                    if (selectedFlight != null) {
+                        // User provides passenger details
+                        System.out.println("Enter your name: ");
+                        String passengerName = scanner.nextLine();
+                        System.out.println("Enter your passenger ID: ");
+                        String passengerId = scanner.nextLine();
 
+                        // check validation
+                        if (passengerName.isEmpty() || passengerId.isEmpty()) {
+                            System.out.println("Invalid Input \n Failed to Book Ticket");
+                            
                         } else {
-                            System.out.println("Invalid flight code. Please try again.");
-                        }
+                            // pass to method
+                            ticketSystem.bookTicket(flightCode, passengerName, passengerId);
 
-                    // flight not generated -> generate flights (case 1) then book ticket (case 2)
+                        }
                     } else {
-                        // User inputs the week start date
-                        System.out.println("Enter the start date of the week (yyyy-MM-dd): ");
-                        
-                        // check date format accuracyy
-                        while (true) {
-                            weekStartDate = scanner.nextLine();
-
-                            try {
-                                LocalDate.parse(weekStartDate, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-                                break;
-                            } catch (Exception e) {
-                                System.out.println("Invalid date format!! Try again!!");
-                            }
-                        }
-
-                        availableFlights = ticketSystem.generateFlightsForWeek(weekStartDate, 3); // 3 flights per day
-
-                        // Display flights to the user
-                        if (availableFlights !=null && !availableFlights.isEmpty()) {
-                            System.out.println("\nAvailable Flights for the week starting " + weekStartDate + ":");
-                            for (Flight flight : availableFlights) {
-                                System.out.println(flight);
-                            }
-                        } else {
-                            System.out.println("No available flights for selected week");
-                        }
-
-                        // User selects a flight
-                        System.out.println("\nChoose a flight code to book a ticket:");
-                        String flightCode = scanner.nextLine();
-
-                        // select the flight
-                        Flight selectedFlight = selectFlight(availableFlights, flightCode);
-
-                        if (selectedFlight != null) {
-                            // User provides passenger details
-                            System.out.println("Enter your name: ");
-                            String passengerName = scanner.nextLine();
-                            System.out.println("Enter your passenger ID: ");
-                            String passengerId = scanner.nextLine();
-
-                            // pass to method
-                            ticketSystem.bookTicket(weekStartDate, flightCode, passengerName, passengerId);
-
-                        } else {
-                            System.out.println("Invalid flight code. Please try again.");
-                        }
+                        System.out.println("Flight ID is invalid!");
                     }
+                    
+                    
                     break;
 
-                case 3:     // cancel ticket
+                case 4:     // cancel ticket
                     
                     System.out.println("Cancel my ticket");
                     break;
                 
-                case 4:     // view ticket stats 
+                case 5:     // view ticket stats 
                     
                     System.out.println("View Ticket Status");
 
                     break;
 
-                case 5: 
+                case 6: 
                     //exit
                     System.out.println("Exiting system... \nThank you for using XYZ Flight Booking System");
                     scanner.close();
