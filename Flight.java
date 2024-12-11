@@ -4,6 +4,9 @@
  */
 package flightds;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 /**
  *
  * @author sharr
@@ -33,12 +36,26 @@ public class Flight {
         return flightCode;
     }
 
+    // getter for flight date
+    public String getDate() {
+        return flightDate;
+    }
+
+    // getter for flight seats
+    public int getAvailableSeats() {
+        return availableSeats;
+    }
+
     // method to book ticket 
     public Ticket bookTicket(Ticket ticket) {
         if (availableSeats > 0) {
             bookedTickets.add(ticket);  //add passenger to confirmed list
             availableSeats--;   // reduce seat num
             ticket.setStatus(TicketStatus.CONFIRMED);
+
+            // update to csv
+            saveSeatsData(flightCode, availableSeats);
+
             return ticket;
         } else {
             ticket.setStatus(TicketStatus.WAITING);
@@ -104,6 +121,33 @@ public class Flight {
 
         // else 
         return "No ticket found for Passenger: " + passenger.getName();
+    }
+
+    public void saveSeatsData(String flightCode, int newAvailableSeats) {
+        // temp list
+        List<String> updatedLine = new ArrayList<>();
+
+        try {
+            // get existing data to check code
+            List<String> lines = Files.readAllLines(Paths.get("flightds/FlightData.csv"));
+
+            // in each line split for code part only
+            for (String line : lines) {
+                String[] parts = line.split(",");
+
+                if (parts[0].equals(flightCode)) { //match !!
+                    parts[2] = String.valueOf(newAvailableSeats);
+                }
+
+                updatedLine.add(String.join(",", parts));
+            }
+
+            // write back to csv
+            Files.write(Paths.get("flightds/FlightData.csv"), updatedLine);
+        } catch(IOException e) {
+            System.out.println("Error saving new flight data !!");
+        }
+        
     }
 
     @Override
