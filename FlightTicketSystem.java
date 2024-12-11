@@ -4,6 +4,10 @@
  */
 package flightds;
 
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -12,85 +16,112 @@ import java.util.ArrayList;
  * @author sharr
  * this class contains all flight schedules 
  */
-import java.util.HashMap;
+
 import java.util.List;
+import java.util.Scanner;
 
 public class FlightTicketSystem {
-    
-    private HashMap<String, FlightSchedule> schedules;
 
-    public FlightTicketSystem() {
-        this.schedules = new HashMap<>();
+    private List<Flight> flights = new ArrayList<>(); // store found flights based on user search
+
+    public List<Flight> getFlights() {
+        return this.flights;
     }
 
-    public FlightSchedule getSchedule(String week) {
-        return schedules.get(week);
-    }
+    // load flight data from csv
+    public void loadFlightData(String filePath, boolean printData) {
 
-    // generate flights based on week user input
-    public List<Flight> generateFlightsForWeek(String weekStartDate, int numFlightsPerDay) {
-        
-        // check if already generated first
-        if (schedules.containsKey(weekStartDate)) {
-           
-            return schedules.get(weekStartDate).listFlights();
-            
-        } 
+        try {
+            Scanner sc = new Scanner(new File(filePath));
 
-        List<Flight> flights = new ArrayList<>();
-        LocalDate startDate = LocalDate.parse(weekStartDate, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-
-        for (int i = 0; i < 7; i++) { // 7 days in a week
-            LocalDate flightDate = startDate.plusDays(i);
-            for (int j = 0; j < numFlightsPerDay; j++) {
-                String flightCode = "FL" + (i + 1) + "-" + (j + 1);
-                Flight flight = new Flight(flightCode, flightDate.toString(), 2); // Assuming 2 seats per flight
-                flights.add(flight);
+            // skip header !!!
+            if (sc.hasNextLine()) {
+                sc.nextLine();
             }
-        }
-        FlightSchedule schedule = new FlightSchedule(weekStartDate);
-        for (Flight flight : flights) {
-            schedule.addFlight(flight);  // add generated flights 
-        }
-        
-        addSchedule(schedule);
-        return flights;
-    }
 
+            while (sc.hasNextLine()) {
+                
+                String line = sc.nextLine();
 
-    // method to add schedule using week
-    public void addSchedule(FlightSchedule schedule) {
-        // check if already exists
-        if (schedules.containsKey(schedule.getWeek())) {
-            System.out.println("Schedule already exists for week: " + schedule.getWeek());
-        } else {
-            schedules.put(schedule.getWeek(), schedule);
+                // only print if true
+                if (printData == true) {
+                    System.out.println(line);
+                }
+                
+                String[] data = line.split(",");   // split by comma
 
+                if (data.length == 3) {
+                    String flightId = data[0];
+                    String flightDate = data[1];
+                    int availableSeats  = Integer.parseInt(data[2]);
+    
+                    flights.add(new Flight(flightId, flightDate, availableSeats));
+    
+                }
+                
+            }
+            sc.close();
+        } catch (FileNotFoundException e) {
+            System.out.println("File Not Found ");
+            e.printStackTrace();
         }
+    
         
     }
 
     // search for flight by week
-    public void searchFlights(String week) {
-        FlightSchedule schedule = schedules.get(week);
-        if (schedule == null) {
-            System.out.println("No schedule found for the week: " + week);
-        } else {
-            schedule.listFlights();
+    public void searchFlights(String userInput) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        LocalDate inputDate = LocalDate.parse(userInput.trim(), formatter);  // ensure right format
+
+        // find start week and end week by user input
+        LocalDate startWeek = inputDate.with(DayOfWeek.MONDAY);
+        LocalDate endWeek = startWeek.plusDays(6); // total 7 end sunday
+
+        System.out.println("Searching for flights from " + startWeek + " to " + endWeek);
+
+        // set found flights in a list
+        List<String> flightsFound = new ArrayList<>();
+
+        for (Flight flight : flights) {
+            String flightDate = flight.getDate().trim();
+            LocalDate fLocalDate = LocalDate.parse(flightDate, formatter);
+
+            // debug check if can get flight code or not
+            //System.out.println("\nFlight: " + flight.getFlightCode() + "ON " + fLocalDate);
+
+            // check for the week in the range of user input datess ONLY
+            if (!fLocalDate.isBefore(startWeek) && !fLocalDate.isAfter(endWeek)) {
+                flightsFound.add("Flight ID: " + flight.getFlightCode() + ", Date: " + flight.getDate() + ", Available Seats: " + flight.getAvailableSeats());
+            }
+
         }
+
+        // display
+        if (!flightsFound.isEmpty()) {
+            System.out.println("Flights for the week of " + userInput);
+            for (String flight : flightsFound) {
+                System.out.println(flight);
+            }
+        } else {
+            System.out.println("No flights available!! ");
+        }
+
+
     }
 
-    // book ticket for the scheduled week
-    public void bookTicket(String week, String flightId, String passengerName, String passengerId) {
-        FlightSchedule schedule = schedules.get(week);
-        // if not found for that week
-        if (schedule == null) {
-            System.out.println("No schedule found for the week: " + week);
-            return;
+    // book ticket for the user input flight id
+    public void bookTicket(String flightId, String passengerName, String passengerId) {
+        Flight flight = null;
+        
+        // check if contains
+        for (Flight userFlight : flights) {
+            if (userFlight.getFlightCode().equals(flightId)) { // yes contains
+                flight = userFlight;
+                break;
+            }
         }
-
         // not found for id
-        Flight flight = schedule.getFlight(flightId);
         if (flight == null) {
             System.out.println("No flight found with ID: " + flightId);
             return;
@@ -111,13 +142,16 @@ public class FlightTicketSystem {
 
     // cancel ticket
     public void cancelTicket(String week, String flightId, String ticketId) {
-        FlightSchedule schedule = schedules.get(week);
-        if (schedule == null) {
-            System.out.println("No schedule found for the week: " + week);
-            return;
+        Flight flight = null;
+        
+        // check if contains
+        for (Flight userFlight : flights) {
+            if (userFlight.getFlightCode().equals(flightId)) { // yes contains
+                flight = userFlight;
+                break;
+            }
         }
-
-        Flight flight = schedule.getFlight(flightId);
+        // not found for id
         if (flight == null) {
             System.out.println("No flight found with ID: " + flightId);
             return;
@@ -129,18 +163,22 @@ public class FlightTicketSystem {
     }
 
     // check ticket status 
-    public void viewTicketStatus(String week, String flightId, Passenger passenger) {
-        FlightSchedule schedule = schedules.get(week);
-        if (schedule == null) {
-            System.out.println("No schedule found for the week: " + week);
-            return;
+    public void viewTicketStatus(String flightId, Passenger passenger) {
+        Flight flight = null;
+        
+        // check if contains
+        for (Flight userFlight : flights) {
+            if (userFlight.getFlightCode().equals(flightId)) { // yes contains
+                flight = userFlight;
+                break;
+            }
         }
-
-        Flight flight = schedule.getFlight(flightId);
+        // not found for id
         if (flight == null) {
             System.out.println("No flight found with ID: " + flightId);
             return;
         }
+
 
         // successful
         String status = flight.viewStatus(passenger);
