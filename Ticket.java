@@ -51,7 +51,7 @@ package flightds;
 
     @Override
     public String toString() {
-        return "TicketID: " + ticketId + ", Passenger: " + passenger.getName() +
-               ", Status: " + status + ", Flight: " + flight.getFlightCode();
+        return "\n\n===== Ticket Info =====" + "\nTicket ID: " + ticketId + " \nPassenger Name: " + passenger.getName() +
+               "\nStatus: " + status + "\nFlight ID: " + flight.getFlightCode() + "\n================";
     }
 }
