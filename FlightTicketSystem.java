@@ -16,13 +16,15 @@ import java.util.ArrayList;
  * @author sharr
  * this class contains all flight schedules 
  */
-
+import java.util.HashMap;
 import java.util.List;
 import java.util.Scanner;
 
 public class FlightTicketSystem {
 
     private List<Flight> flights = new ArrayList<>(); // store found flights based on user search
+
+    private HashMap<String, Passenger> registeredPassenger = new HashMap<>(); // store passenger detail
 
     public List<Flight> getFlights() {
         return this.flights;
@@ -113,6 +115,12 @@ public class FlightTicketSystem {
     // book ticket for the user input flight id
     public void bookTicket(String flightId, String passengerName, String passengerId) {
         Flight flight = null;
+
+        // check for passenger id
+        if (registeredPassenger.containsKey(passengerId)) {
+            System.out.println("Invalid Passenger ID");
+            return;
+        }
         
         // check if contains
         for (Flight userFlight : flights) {
@@ -132,10 +140,13 @@ public class FlightTicketSystem {
         Ticket ticket = new Ticket(passenger, TicketStatus.WAITING, flight);    // set default as waiting first
         Ticket bookedTicket = flight.bookTicket(ticket);
 
+        // check passenger id before processing
+        registeredPassenger.put(passengerId, passenger);
+
         if (bookedTicket.getStatus() == TicketStatus.CONFIRMED) {
-            System.out.println("Ticket booked successfully: " + bookedTicket);
+            System.out.println("Ticket booked successfully: " + bookedTicket); // get Ticket info print
         } else {
-            System.out.println("No seats available. Added to Waiting List");
+            System.out.println("No seats available. Added to Waiting List " + bookedTicket);
         }
     
     }
