@@ -22,6 +22,7 @@ public class Flight {
     private int availableSeats; // num of seats able to book
     private List<Ticket> bookedTickets; // stores confirmed tickets !!
     private Queue<Ticket> waitingList = new Queue<>();  // waiting list q
+    private QueueStore queueStore = new QueueStore(waitingList);    // queue list for storage
 
     // constructor
     public Flight(String flightCode, String flightDate, int availableSeats) {
@@ -29,6 +30,8 @@ public class Flight {
         this.flightDate = flightDate;
         this.availableSeats = availableSeats;
         this.bookedTickets = new ArrayList<>();
+        this.queueStore = new QueueStore(waitingList);
+
     }
 
     // getter for flight id
@@ -61,7 +64,10 @@ public class Flight {
             ticket.setStatus(TicketStatus.WAITING);
 
             // no vacany add passenger to waiting list
-            waitingList.enqueue(ticket);    
+            //waitingList.enqueue(ticket); 
+            // load waiting list csv 
+            queueStore.loadFromCSV("flightds/waitinglist.csv");
+            queueStore.enqueueSave(ticket, "flightds/waitinglist.csv");
 
             return ticket;
         }
@@ -123,6 +129,7 @@ public class Flight {
         return "No ticket found for Passenger: " + passenger.getName();
     }
 
+    // update available seats info realtime
     public void saveSeatsData(String flightCode, int newAvailableSeats) {
         // temp list
         List<String> updatedLine = new ArrayList<>();
