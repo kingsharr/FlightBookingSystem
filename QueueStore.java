@@ -85,8 +85,10 @@ public class QueueStore {
 
             // replace ori file with updated temp
             if (inputFile.delete() && tempFile.renameTo(inputFile)) {
+                // debug code remove once works 
                 System.out.println("Removed from waiting list");
             } else {
+                // debug code remove once works 
                 System.out.println("Error updating csv waiting list");
             }
 
