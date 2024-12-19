@@ -103,7 +103,7 @@ public List<Ticket> getWaitingList() {
             ticket.setStatus(TicketStatus.WAITING);
 
             // no vacancy add passenger to waiting list
-            queueStore.loadFromCSV("waitinglist.csv");
+            //queueStore.loadFromCSV("waitinglist.csv");
             queueStore.enqueueSave(ticket, "waitinglist.csv");
 
             return ticket;
@@ -622,128 +622,157 @@ class QueueStore {
     
     private Queue<Ticket> queue;
 
+    public Queue<Ticket> getQueue() {
+        if (queue == null) {
+            loadFromCSV("flightds/waitinglist.csv");
+        }
+        
+        return queue;
+    }
+
     public QueueStore(Queue<Ticket> queue) {
         this.queue = queue;
     }
 
     // enqueue n save to csv
-     public void enqueueSave(Ticket ticket, String filepath) {
+    public void enqueueSave(Ticket ticket, String filepath) {
         queue.enqueue(ticket);
         saveToCSV(filepath);
     }
 
     // dequeueu n remove frm csv
-    public Ticket dequeueRemove(String filepath) {
-        Ticket ticket2 = queue.dequeue();
-        if (ticket2 != null) {
-            removeFromCSV(ticket2, filepath);
+    public Ticket dequeueRemove(String flightId) {
+        
+        //temp queue while looping
+        Queue<Ticket> tempQueue = new Queue<>();
+        Ticket foundTicket = null;
+        
+        while (!queue.isEmpty()) {
+            Ticket ticket = queue.dequeue();
+            //System.out.println("Dequeue ticket: " + ticket);
+
+            boolean ticketFound = ticket.getFlight().getFlightCode().equals(flightId);
+
+            if (ticketFound && foundTicket ==null) {
+                foundTicket = ticket;
+                System.out.println("FOUND ticket ");
+                removeFromCSV(ticket, "flightds/waitinglist.csv");
+            } else {
+                tempQueue.enqueue(ticket);  // add the unmatched ticekts
+            }
+
+        }
+
+        queue = tempQueue;
+
+        if (foundTicket == null) {
+            System.out.println("NO Ticket FOUND " + flightId);
         }
         
-        return ticket2;
+    
+        return foundTicket;
         
     }
 
     // save queueu to csv file
     private void saveToCSV(String filepath) {
-    try {
-        File file = new File(filepath);
-        boolean fileExists = file.exists() && file.length() > 0;
-
-        try (FileWriter fileWriter = new FileWriter(filepath, false)) {
-            // Add header if file is new or empty
-            if (!fileExists) {
-                fileWriter.append("TicketID,PassengerName,PassengerID,FlightCode,FlightDate\n");
-            }
-
+        try (FileWriter fileWriter = new FileWriter(filepath, true)) {
+            //fileWriter.write("TicketID,PassengerName,PassengerID,FlightCode,FlightDate\n");
+            
             for (Ticket ticket : queue.getQueue()) {
                 fileWriter.append(ticket.getTicketId()).append(",")
-                .append(ticket.getPassenger().getName()).append(",")
-                .append(ticket.getPassenger().getPassengerId()).append(",")
-                .append(ticket.getFlight().getFlightCode()).append(",")
-                .append(ticket.getFlight().getDate()).append("\n");
+                    .append(ticket.getPassenger().getName()).append(",")
+                    .append(ticket.getPassenger().getPassportNum()).append(",")
+                    .append(ticket.getFlight().getFlightCode()).append(",")
+                    .append(ticket.getFlight().getDate()).append("\n");
             }
+            
+        } catch (IOException e) {
+            System.out.println("Error: " + e.getMessage());
         }
-        
-    } catch (IOException e) {
-        System.out.println("Error: " + e.getMessage());
     }
-}
 
     // remove ticket from csv once if availble seats
-    private void removeFromCSV(Ticket ticket, String filepath) {
-    try {
-        // Read all lines from the file
-        List<String> lines = Files.readAllLines(Paths.get(filepath));
-        
-        // Create a list to store lines to keep
+    private boolean removeFromCSV(Ticket ticket, String filepath) {
+
         List<String> updatedLines = new ArrayList<>();
+        String line;
+        boolean remove = false;
         
-        // Add header first
-        updatedLines.add(lines.get(0));
-        
-        // Iterate through the lines, skipping the header
-        boolean removed = false;
-        for (int i = 1; i < lines.size(); i++) {
-            String line = lines.get(i);
-            String[] details = line.split(",");
-            
-            // Check if this line matches the ticket to remove
-            if (!removed && 
-                details[2].trim().equals(ticket.getPassenger().getPassengerId()) && 
-                details[1].trim().equals(ticket.getPassenger().getName()) && 
-                details[3].trim().equals(ticket.getFlight().getFlightCode())) {
-                // Skip this line (effectively removing it)
-                removed = true;
-            } else {
-                // Keep this line
-                updatedLines.add(line);
+        try (BufferedReader reader = new BufferedReader(new FileReader(filepath)))  {
+
+            String header = reader.readLine(); //header
+            updatedLines.add(header);
+
+            while ((line = reader.readLine()) != null) {
+                String[] details = line.split(",\\s*");
+
+                // check if same
+                if (details.length >=5 && 
+                    details[3].trim().equals(ticket.getFlight().getFlightCode()) 
+                    && details[2].trim().equals(ticket.getPassenger().getPassportNum())) {
+                    
+                    // all same dequeue
+                    remove = true;
+                    System.out.println("Removed from waiting list " + line);
+                    continue;
+                } else {
+                    updatedLines.add(line);  // keep other lines
+
+                }
             }
+
+            // updated
+            if (remove) {
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(filepath))) {
+                    for (String updatedLine : updatedLines) {
+                        writer.write(updatedLine + "\n");
+                        
+                    }
+                    
+                    
+                    // debug code
+                    System.out.println("Updated waiting list");
+                    return true;
+                } 
+            } 
+
+        }catch (IOException e) {
+            System.out.println("Error: " + e.getMessage());
         }
-        
-        // Write the updated lines back to the file
-        Files.write(Paths.get(filepath), updatedLines);
-        
-        if (removed) {
-            System.out.println("Ticket removed from waiting list.");
-        }
-    } catch (IOException e) {
-        System.out.println("Error removing ticket from CSV: " + e.getMessage());
+        return false;
     }
-}
 
     // load csv waiting list
     public void loadFromCSV(String filepath) {
-    try (BufferedReader reader = new BufferedReader(new FileReader(filepath))) {
-        
-        String line;
-        boolean isFirstLine = true;
+        queue = new Queue<>();
 
-        while ((line = reader.readLine()) != null ) {
-            // Skip header
-            if (isFirstLine) {
-                isFirstLine = false;
-                continue;
+        try (BufferedReader reader = new BufferedReader(new FileReader(filepath))) {
+            
+            String line;
+            reader.readLine();  // skip header
+
+            while ((line = reader.readLine()) != null ) {
+                String[] details = line.split(",\\s*");
+
+                if (details.length ==5) {
+
+                    
+                    Ticket ticket = new Ticket(
+                        new Passenger(details[1], details[2]),
+                        TicketStatus.WAITING, 
+                        new Flight(details[3], "", 0));
+                    
+                    ticket.setTicketId(details[0]);
+                    //System.out.println("Load ticket id " + ticket.getTicketId());
+                    queue.enqueue(ticket);
+                }
             }
-
-            String[] details = line.split(",");
-
-            if (details.length == 5) {
-                // Set a default status if parsing fails
-                TicketStatus status = TicketStatus.WAITING;
-                
-                Ticket ticket = new Ticket(
-                    new Passenger(details[1].trim(), details[2].trim()),
-                    status, 
-                    new Flight(details[3].trim(), "", 0));
-
-                queue.enqueue(ticket);
-            }
+            
+        } catch (IOException e) {
+            System.out.println("Error: " + e.getMessage());
         }
-        
-    } catch (IOException e) {
-        System.out.println("Error: " + e.getMessage());
     }
-}
 }
  class Ticket {
     
@@ -755,7 +784,8 @@ class QueueStore {
 
     // constructor
     public Ticket(Passenger passenger, TicketStatus status, Flight flight) {
-        this.ticketId = "T" + (ticketCount++);  // simple id
+        String timeStamp = new SimpleDateFormat("mmss").format(new Date());
+        this.ticketId = "T" + flight.getFlightCode()+ "_"+timeStamp;   // simple id
         this.passenger = passenger;
         this.status = status;
         this.flight = flight;
@@ -795,364 +825,405 @@ class QueueStore {
     CONFIRMED,
     WAITING
 }
+
 class TicketManager {
+
     private FlightTicketSystem ticketSystem;
+    private Flight flight;
 
     public TicketManager(FlightTicketSystem ticketSystem) {
         this.ticketSystem = ticketSystem;
-    }
-    public void cancelTicket(String flightId, String passengerId) {
-    try {
-        // First, check and remove from Confirmed Tickets CSV
-        boolean removedFromConfirmed = cancelConfirmedTicket(flightId, passengerId);
         
-        // If removed from confirmed, process waiting list
-        if (removedFromConfirmed) {
-            // Create a Queue to manage waiting list
-            Queue<Ticket> waitingQueue = new Queue<>();
-            QueueStore queueStore = new QueueStore(waitingQueue);
+    }
+
+    public void cancelTicket(String flightId, String passengerId) {
+        try {
+
+            Flight flightCancel = null;
+            for (Flight flight : ticketSystem.getFlights()) {
+                if (flight.getFlightCode().equals(flightId)) {
+                    flightCancel = flight;
+                    break;
+                }
+            }
+
+            if (flightCancel == null) {
+                System.out.println("Flight not found: " + flightId);
+                return;
+            }
+
+            // check and remove from Confirmed Tickets csv
+            boolean removedFromConfirmed = cancelConfirmedTicket(flightId, passengerId);
             
-            // Load waiting list tickets from CSV
-            queueStore.loadFromCSV("waitinglist.csv");
-            
-            // Find and remove the first waiting ticket for this flight
-            Ticket firstWaitingTicket = findFirstWaitingTicketForFlight(waitingQueue, flightId);
-            
-            if (firstWaitingTicket != null) {
-                // Remove the ticket from waiting list
-                queueStore.dequeueRemove("waitinglist.csv");
-                
-                // Update flight available seats
-                updateFlightAvailableSeats(firstWaitingTicket.getFlight().getFlightCode());
-                
-                // Save this ticket to confirmed tickets
-                saveToConfirmedTickets(firstWaitingTicket);
-                
-                System.out.println("First waiting list ticket promoted to confirmed.");
+            // if removed from confirmed, process waiting list
+            if (removedFromConfirmed) {
+                //update seats
+                int availableSeats = flightCancel.getAvailableSeats()+1;
+                flightCancel.saveSeatsData(flightId, availableSeats);
+                processWaitingList(flightId);   // check in waiting list to add
+
             } else {
-                // If no waiting list ticket, still update available seats
-                updateFlightAvailableSeats(flightId);
+                // not in confirmed check waiting list
+                boolean removedFromWaiting = cancelWaitingTicket(flightId, passengerId);
+                
+                if (removedFromWaiting) {
+                   
+                    processWaitingList(flightId);   // add the next person in waiting list 
+                    System.out.println("Ticket removed from waiting list.");
+                } else {
+                    System.out.println("No ticket found for Passenger ID " + passengerId + " on Flight " + flightId);
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("Error canceling ticket: " + e.getMessage());
+        }
+    }
+
+    private boolean cancelConfirmedTicket(String flightId, String passengerId) throws IOException {
+        List<String> updatedLines = new ArrayList<>();
+        boolean ticketRemoved = false;
+        
+        try (BufferedReader reader = new BufferedReader(new FileReader("flightds/ConfirmedTickets.csv"))) {
+            String line;
+            
+            // Read header
+            String header = reader.readLine();
+            updatedLines.add(header);
+
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",\\s*");
+                
+                // Check if ticket matches flight and passenger
+                if (parts.length >=4 && parts[3].equals(flightId) && parts[2].equals(passengerId)) {
+                    ticketRemoved = true;
+                    System.out.println("Ticket canceled: " + line); 
+                    continue;
+                } else {
+                    //System.out.println("No match " + line);
+                    updatedLines.add(line); // maintain other lines 
+                }
+            }
+        }
+
+        // Rewrite the file if a ticket was removed
+        if (ticketRemoved) {
+            try (FileWriter writer = new FileWriter("flightds/ConfirmedTickets.csv")) {
+                for (String updatedLine : updatedLines) {
+                    writer.write(updatedLine + "\n");
+                }
+            }
+        }
+
+        return ticketRemoved;
+    }
+
+    private boolean cancelWaitingTicket(String flightId, String passengerId) throws IOException {
+        List<String> updatedLines = new ArrayList<>();
+        boolean ticketRemoved = false;
+        
+        try (BufferedReader reader = new BufferedReader(new FileReader("flightds/waitinglist.csv"))) {
+            String line;
+            
+            // Read header
+            String header = reader.readLine();
+            updatedLines.add(header);
+
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",\\s*");
+                
+                // Check if ticket matches flight and passenger
+                if (parts.length >=5 && parts[3].trim().equals(flightId) && parts[1].trim().equals(passengerId)) {
+                    ticketRemoved = true;
+                    System.out.println("Ticket removed from waiting list: " + line);
+                } else {
+                    updatedLines.add(line);
+                }
+            }
+        }
+
+        // Rewrite the file if a ticket was removed
+        if (ticketRemoved) {
+            try (FileWriter writer = new FileWriter("flightds/waitinglist.csv")) {
+                for (String updatedLine : updatedLines) {
+                    writer.write(updatedLine + "\n");
+                }
+            }
+        }
+
+        return ticketRemoved;
+    }
+
+    private void processWaitingList(String flightId) throws IOException {
+        //List<String> waitingTicketsForFlight = new ArrayList<>();
+        //List<String> otherWaitingTickets = new ArrayList<>();
+
+        Flight flight = null;
+        // find flightd
+        for (Flight f : ticketSystem.getFlights()) {
+            if (f.getFlightCode().equals(flightId)) {
+                flight = f;
+                break;
+            }
+        }
+
+        if (flight == null) {
+            System.out.println("Flight not found: " + flightId);
+            return;
+        }
+        
+        QueueStore queueStore = new QueueStore(null);
+        queueStore.loadFromCSV("flightds/waitinglist.csv");
+        
+        Queue<Ticket> waitingQueue = queueStore.getQueue();
+        
+        // dequeue first ticket
+        Ticket firstWaitingTicket = queueStore.dequeueRemove(flightId);
+
+        if (firstWaitingTicket != null) {
+            try (FileWriter writer = new FileWriter("flightds/ConfirmedTickets.csv", true)) {
+                writer.append(firstWaitingTicket.getTicketId()).append(",")
+                .append(firstWaitingTicket.getPassenger().getName()).append(",")
+                .append(firstWaitingTicket.getPassenger().getPassportNum()).append(",")
+                .append(firstWaitingTicket.getFlight().getFlightCode()).append(",")
+                .append(firstWaitingTicket.getFlight().getDate()).append("\n");
+
+                System.out.println("First waiting list ticket promoted to confirmed: " + firstWaitingTicket);
+
+                // update seat count
+                flight.saveSeatsData(flightId, flight.getAvailableSeats());
+
             }
         } else {
-            // If not in confirmed, check waiting list
-            boolean removedFromWaiting = cancelWaitingTicket(flightId, passengerId);
-            
-            if (removedFromWaiting) {
-                System.out.println("Ticket removed from waiting list.");
-            } else {
-                System.out.println("No ticket found for Passenger ID " + passengerId + " on Flight " + flightId);
-            }
+            System.out.println("No waiting ticket to move for confirmed");
         }
-    } catch (IOException e) {
-        System.out.println("Error canceling ticket: " + e.getMessage());
-    }
-}
-
-private void updateFlightAvailableSeats(String flightCode) throws IOException {
-    List<String> lines = new ArrayList<>();
-    boolean flightUpdated = false;
-
-    try (BufferedReader reader = new BufferedReader(new FileReader("FlightData.csv"))) {
-        // Read header
-        String header = reader.readLine();
-        lines.add(header);
-
-        String line;
-        while ((line = reader.readLine()) != null) {
-            String[] parts = line.split(",");
+        /* 
+        try (BufferedReader reader = new BufferedReader(new FileReader("flightds/waitinglist.csv"))) {
+            // Read header
+            String header = reader.readLine();
             
-            // Check if flight matches
-            if (parts[0].equals(flightCode)) {
-                // Increment available seats
-                int currentSeats = Integer.parseInt(parts[2]);
-                parts[2] = String.valueOf(currentSeats + 1);
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",\\s*");
                 
-                line = String.join(",", parts);
-                flightUpdated = true;
-            }
-            
-            lines.add(line);
-        }
-    }
-
-
-    // If flight was found and updated, rewrite the entire file
-     if (flightUpdated) {
-        try (FileWriter writer = new FileWriter("FlightData.csv")) {
-            for (String updatedLine : lines) {
-                writer.write(updatedLine + "\n");
-            }
-        }
-    }
-}
-
-private Ticket findFirstWaitingTicketForFlight(Queue<Ticket> waitingQueue, String flightId) {
-    for (Ticket ticket : waitingQueue.getQueue()) {
-        if (ticket.getFlight().getFlightCode().equals(flightId)) {
-            return ticket;
-        }
-    }
-    return null;
-}
-
-private void saveToConfirmedTickets(Ticket ticket) throws IOException {
-    try (FileWriter writer = new FileWriter("ConfirmedTickets.csv", true)) {
-        // Check if file is empty to add header
-        File file = new File("ConfirmedTickets.csv");
-        if (file.length() == 0) {
-            writer.append("TicketID,PassengerName,PassengerID,FlightCode,FlightDate\n");
-        }
-        
-        // Append ticket details
-        writer.append(String.format("%s,%s,%s,%s,%s\n", 
-            ticket.getTicketId(), 
-            ticket.getPassenger().getName(), 
-            ticket.getPassenger().getPassengerId(),
-            ticket.getFlight().getFlightCode(),
-            ticket.getFlight().getDate()));
-    }
-}
-
-private boolean cancelConfirmedTicket(String flightId, String passengerId) throws IOException {
-    List<String> updatedLines = new ArrayList<>();
-    boolean ticketRemoved = false;
-    String cancelledTicketLine = null;
-    
-    try (BufferedReader reader = new BufferedReader(new FileReader("ConfirmedTickets.csv"))) {
-        // Read header
-        updatedLines.add(reader.readLine());
-
-        String line;
-        while ((line = reader.readLine()) != null) {
-            String[] parts = line.split(",");
-            
-            // Check if ticket matches flight and passenger
-            if (parts[3].equals(flightId) && parts[2].equals(passengerId)) {
-                ticketRemoved = true;
-                cancelledTicketLine = line;
-                
-                System.out.println("Ticket canceled: " + line);
-            } else {
-                updatedLines.add(line);
-            }
-        }
-    }
-
-    // Rewrite the file if a ticket was removed
-    if (ticketRemoved) {
-        try (FileWriter writer = new FileWriter("ConfirmedTickets.csv")) {
-            for (String updatedLine : updatedLines) {
-                writer.write(updatedLine + "\n");
-            }
-        }
-        
-        // Save cancelled ticket to CancelledTickets.csv
-        if (cancelledTicketLine != null) {
-            saveCancelledTicket(cancelledTicketLine);
-        }
-    }
-
-    return ticketRemoved;
-}
-
-private boolean cancelWaitingTicket(String flightId, String passengerId) throws IOException {
-    List<String> updatedLines = new ArrayList<>();
-    boolean ticketRemoved = false;
-    String cancelledTicketLine = null;
-    
-    try (BufferedReader reader = new BufferedReader(new FileReader("waitinglist.csv"))) {
-        // Read header
-        updatedLines.add(reader.readLine());
-        
-        String line;
-        while ((line = reader.readLine()) != null) {
-            String[] parts = line.split(",");
-            
-            // Check if ticket matches flight and passenger
-            if (parts[3].equals(flightId) && parts[2].equals(passengerId)) {
-                ticketRemoved = true;
-                cancelledTicketLine = line;
-                System.out.println("Ticket removed from waiting list: " + line);
-            } else {
-                updatedLines.add(line);
-            }
-        }
-    }
-
-    // Rewrite the file if a ticket was removed
-    if (ticketRemoved) {
-        try (FileWriter writer = new FileWriter("waitinglist.csv")) {
-            for (String updatedLine : updatedLines) {
-                writer.write(updatedLine + "\n");
-            }
-        }
-        
-        // Save cancelled ticket to CancelledTickets.csv
-        if (cancelledTicketLine != null) {
-            saveCancelledTicket(cancelledTicketLine);
-        }
-    }
-
-    return ticketRemoved;
-}
-
-private void saveCancelledTicket(String ticketLine) throws IOException {
-    try (FileWriter fileWriter = new FileWriter("CancelledTickets.csv", true)) {
-        // Check if file is empty to add header
-        File file = new File("CancelledTickets.csv");
-        if (file.length() == 0) {
-            fileWriter.append("TicketID,PassengerName,PassengerID,FlightCode,FlightDate,CancellationDate\n");
-        }
-        
-        // Append ticket details with cancellation date
-        String cancelledTicketEntry = ticketLine + "," + 
-            LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) + "\n";
-        fileWriter.append(cancelledTicketEntry);
-    }
-}
-
-    public void editTicket(String flightId, String passengerId, Scanner scanner) {
-    try {
-        // Check Confirmed Tickets CSV first
-        boolean ticketFoundAndEdited = editConfirmedTicket(flightId, passengerId, scanner);
-
-        // If not found in Confirmed Tickets, try Waiting List
-        if (!ticketFoundAndEdited) {
-            editWaitingListTicket(flightId, passengerId, scanner);
-        }
-    } catch (IOException e) {
-        System.out.println("Error editing ticket: " + e.getMessage());
-    }
-}
-
-private boolean editConfirmedTicket(String flightId, String passengerId, Scanner scanner) throws IOException {
-    List<String> lines = new ArrayList<>();
-    boolean ticketFoundAndEdited = false;
-
-    try (BufferedReader reader = new BufferedReader(new FileReader("ConfirmedTickets.csv"))) {
-        // Read header
-        String header = reader.readLine();
-        lines.add(header);
-
-        String line;
-        while ((line = reader.readLine()) != null) {
-            String[] parts = line.split(",");
-            
-            // Check if ticket matches flight and passenger ID
-            if (parts[3].equals(flightId) && parts[2].equals(passengerId)) {
-                // Ticket found, allow editing
-                System.out.println("Current Passenger Name: " + parts[1]);
-                System.out.println("Passenger ID: " + parts[2]);
-                
-                // Ask for new passenger name
-                System.out.print("Enter new passenger name (press Enter to keep current): ");
-                String newName = scanner.nextLine().trim();
-                if (newName.isEmpty()) {
-                    newName = parts[1];
+                if (parts.length >=5 && parts[3].trim().equalsIgnoreCase(flightId)) {
+                    //waitingTicketsForFlight.add(line);  // match found
+                    waitingQueue.enqueue(line);
+                } else {
+                    otherWaitingTickets.add(line);  // others
                 }
-                 System.out.print("Enter new passenger ID (press Enter to keep current): ");
-                String newPassengerId = scanner.nextLine().trim();
-                if (newPassengerId.isEmpty()) {
-                    newPassengerId = parts[2];
-                }
-                
-                // Reconstruct the line with updated information
-                String updatedLine = String.format("%s,%s,%s,%s,%s", 
-                    parts[0], newName, newPassengerId, parts[3], parts[4]);
-                
-                lines.add(updatedLine);
-                ticketFoundAndEdited = true;
-                
-                System.out.println("Ticket information updated successfully!");
-            } else {
-                // Write the original line
-                lines.add(line);
             }
         }
-    }
 
-    // If ticket was found and edited, rewrite the entire file
-    if (ticketFoundAndEdited) {
-        try (FileWriter writer = new FileWriter("ConfirmedTickets.csv")) {
-            for (String updatedLine : lines) {
-                writer.write(updatedLine + "\n");
-            }
-        }
-    }
-
-    return ticketFoundAndEdited;
-}
-
-private void editWaitingListTicket(String flightId, String passengerId, Scanner scanner) throws IOException {
-    List<String> lines = new ArrayList<>();
-    boolean ticketFoundAndEdited = false;
-
-    try (BufferedReader reader = new BufferedReader(new FileReader("waitinglist.csv"))) {
-        // Read header
-        String header = reader.readLine();
-        lines.add(header);
-
-        String line;
-        while ((line = reader.readLine()) != null) {
-            String[] parts = line.split(",");
+        // Process first waiting ticket
+        if (!waitingTicketsForFlight.isEmpty()) {
+            String firstWaitingTicket = waitingTicketsForFlight.remove(0);
             
-            // Check if ticket matches flight and passenger ID
-            if (parts[3].equals(flightId) && parts[2].equals(passengerId)) {
-                // Ticket found, allow editing
-                System.out.println("Current Passenger Name: " + parts[1]);
-                System.out.println("Passenger ID: " + parts[2]);
+            // Add to confirmed tickets
+            try (FileWriter confirmedWriter = new FileWriter("flightds/ConfirmedTickets.csv", true)) {
+                confirmedWriter.write(firstWaitingTicket + "\n");
+                System.out.println("First waiting list ticket promoted to confirmed: " + firstWaitingTicket);
+
                 
-                // Ask for new passenger name
-                System.out.print("Enter new passenger name (press Enter to keep current): ");
-                String newName = scanner.nextLine().trim();
-                if (newName.isEmpty()) {
-                    newName = parts[1];
-                }
-                 System.out.print("Enter new passenger ID (press Enter to keep current): ");
-                String newPassengerId = scanner.nextLine().trim();
-                if (newPassengerId.isEmpty()) {
-                    newPassengerId = parts[2];
-                }
-                
-                // Reconstruct the line with updated information
-                String updatedLine = String.format("%s,%s,%s,%s,%s", 
-                    parts[0], newName, newPassengerId, parts[3], parts[4]);
-                
-                lines.add(updatedLine);
-                ticketFoundAndEdited = true;
-                
-                System.out.println("Ticket information updated successfully!");
-            } else {
-                // Write the original line
-                lines.add(line);
             }
+        }
+
+        // Rewrite waiting list
+        try (FileWriter waitingWriter = new FileWriter("flightds/waitinglist.csv")) {
+            // Write header
+            waitingWriter.write("TicketID,PassengerName,PassengerID,FlightCode,FlightDate\n");
+            
+            // Write waiting tickets for other flights
+            for (String ticket : otherWaitingTickets) {
+                waitingWriter.write(ticket + "\n");
+            }
+            
+            // Write remaining waiting tickets for this flight
+            for (String ticket : waitingQueue) {
+                waitingWriter.write(ticket + "\n");
+            }
+        }
+        */
+    }
+/* 
+    private void rearrangeWaitingList(String flightId) throws IOException {
+        List<String> waitingTicketsForFlight = new ArrayList<>();
+        List<String> otherWaitingTickets = new ArrayList<>();
+        
+        try (BufferedReader reader = new BufferedReader(new FileReader("flightds/waitinglist.csv"))) {
+            // Read header
+            String header = reader.readLine();
+            
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",\\s*");
+                
+                if (parts[4].trim().equals(flightId)) {
+                    waitingTicketsForFlight.add(line);
+                } else {
+                    otherWaitingTickets.add(line);
+                }
+            }
+        }
+
+        // Rewrite waiting list
+        try (FileWriter waitingWriter = new FileWriter("flightds/waitinglist.csv")) {
+            // Write header
+            waitingWriter.write("TicketID,PassengerID,PassengerName,Status,FlightCode\n");
+            
+            // Write waiting tickets for other flights
+            for (String ticket : otherWaitingTickets) {
+                waitingWriter.write(ticket + "\n");
+            }
+            
+            // Write remaining waiting tickets for this flight
+            for (String ticket : waitingTicketsForFlight) {
+                waitingWriter.write(ticket + "\n");
+            }
+        }
+    }
+*/
+    public void editTicket(String ticketId, Scanner scanner) {
+        try {
+            // Check Confirmed Tickets CSV first
+            File confirmedFile = new File("flightds/ConfirmedTickets.csv");
+            File tempConfirmedFile = new File("flightds/ConfirmedTickets_temp.csv");
+            boolean ticketFoundAndEdited = false;
+
+            // Read Confirmed Tickets
+            try (BufferedReader reader = new BufferedReader(new FileReader(confirmedFile));
+                 FileWriter writer = new FileWriter(tempConfirmedFile)) {
+                
+                // Write header
+                String header = reader.readLine();
+                writer.write(header + "\n");
+
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String[] parts = line.split(",");
+                    
+                    // Find the ticket
+                    if (parts[0].equals(ticketId)) {
+                        // Ticket found, allow editing
+                        System.out.println("Current Passenger Name: " + parts[1]);
+                        System.out.println("Current Passport ID: " + parts[2]);
+                        
+                        // Ask for new passenger name
+                        System.out.print("Enter new passenger name (press Enter to keep current): ");
+                        String newName = scanner.nextLine().trim();
+                        if (newName.isEmpty()) {
+                            newName = parts[1];
+                        }
+                        
+                        // Ask for new passenger ID
+                        System.out.print("Enter new Passport ID (press Enter to keep current): ");
+                        String newPassengerId = scanner.nextLine().trim();
+                        if (newPassengerId.isEmpty()) {
+                            newPassengerId = parts[2];
+                        }
+                        
+                        // Reconstruct the line with updated information
+                        String updatedLine = String.format("%s,%s,%s,%s,%s\n", 
+                            ticketId, newName, newPassengerId, parts[3], parts[4]);
+                        
+                        writer.write(updatedLine);
+                        ticketFoundAndEdited = true;
+                        
+                        System.out.println("Ticket information updated successfully!");
+                    } else {
+                        // Write the original line
+                        writer.write(line + "\n");
+                    }
+                }
+            }
+
+            // Check Waiting List CSV
+            if (!ticketFoundAndEdited) {
+                File waitingFile = new File("flightds/waitinglist.csv");
+                File tempWaitingFile = new File("flightds/waitinglist_temp.csv");
+
+                try (BufferedReader reader = new BufferedReader(new FileReader(waitingFile));
+                     FileWriter writer = new FileWriter(tempWaitingFile)) {
+                    
+                    // Write header
+                    String header = reader.readLine();
+                    writer.write(header + "\n");
+
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        String[] parts = line.split(",");
+                        
+                        // Find the ticket
+                        if (parts[0].equals(ticketId)) {
+                            // Ticket found, allow editing
+                            System.out.println("Current Passenger Name: " + parts[2]);
+                            System.out.println("Current Passport ID: " + parts[1]);
+                            
+                            // Ask for new passenger name
+                            System.out.print("Enter new passenger name (press Enter to keep current): ");
+                            String newName = scanner.nextLine().trim();
+                            if (newName.isEmpty()) {
+                                newName = parts[2];
+                            }
+                            
+                            // Ask for new passenger ID
+                            System.out.print("Enter new passport ID (press Enter to keep current): ");
+                            String newPassengerId = scanner.nextLine().trim();
+                            if (newPassengerId.isEmpty()) {
+                                newPassengerId = parts[1];
+                            }
+                            
+                            // Reconstruct the line with updated information
+                            String updatedLine = String.format("%s,%s,%s,%s,%s\n", 
+                                ticketId, newPassengerId, newName, parts[3], parts[4]);
+                            
+                            writer.write(updatedLine);
+                            ticketFoundAndEdited = true;
+                            
+                            System.out.println("Ticket information updated successfully!");
+                        } else {
+                            // Write the original line
+                            writer.write(line + "\n");
+                        }
+                    }
+                }
+
+                // Replace waiting list file
+                if (ticketFoundAndEdited) {
+                    waitingFile.delete();
+                    tempWaitingFile.renameTo(waitingFile);
+                } else {
+                    tempWaitingFile.delete();
+                }
+            }
+
+            // Replace confirmed tickets file
+            if (ticketFoundAndEdited) {
+                confirmedFile.delete();
+                tempConfirmedFile.renameTo(confirmedFile);
+            } else {
+                tempConfirmedFile.delete();
+                System.out.println("No ticket found with ID: " + ticketId);
+            }
+
+        } catch (IOException e) {
+            System.out.println("Error editing ticket: " + e.getMessage());
         }
     }
 
-    // If ticket was found and edited, rewrite the entire file
-    if (ticketFoundAndEdited) {
-        try (FileWriter writer = new FileWriter("waitinglist.csv")) {
-            for (String updatedLine : lines) {
-                writer.write(updatedLine + "\n");
-            }
-        }
-    } else {
-        System.out.println("No ticket found for Flight ID: " + flightId + " and Passenger ID: " + passengerId);
-    }
-}
 
     // Method to view ticket status by checking CSV files
    public void viewTicketStatus(String flightId, String passengerId) {
         boolean ticketFound = false;
         
         // Check Confirmed Tickets CSV
-        try (BufferedReader confirmedReader = new BufferedReader(new FileReader("ConfirmedTickets.csv"))) {
+        try (BufferedReader confirmedReader = new BufferedReader(new FileReader("flightds/ConfirmedTickets.csv"))) {
             String line;
-            confirmedReader.readLine(); // Skip header
+            confirmedReader.readLine(); // skip header
             
             while ((line = confirmedReader.readLine()) != null) {
-                String[] parts = line.split(",");
-                if (parts[3].equals(flightId) && parts[2].equals(passengerId)) {
+                String[] parts = line.split(",\\s*");
+
+                if (parts.length >=4 && parts[3].equals(flightId) && parts[2].equals(passengerId)) {
                     System.out.println("Ticket Status: CONFIRMED");
                     System.out.println("Passenger Name: " + parts[1]);
                     System.out.println("Flight Code: " + parts[3]);
@@ -1164,18 +1235,18 @@ private void editWaitingListTicket(String flightId, String passengerId, Scanner 
             System.out.println("Error reading Confirmed Tickets: " + e.getMessage());
         }
 
-        // If not found in confirmed, check Waiting List CSV
+        // check in waiting list csv
         if (!ticketFound) {
-            try (BufferedReader waitingReader = new BufferedReader(new FileReader("waitinglist.csv"))) {
+            try (BufferedReader waitingReader = new BufferedReader(new FileReader("flightds/waitinglist.csv"))) {
                 String line;
-                waitingReader.readLine();
+               
                 
                 while ((line = waitingReader.readLine()) != null) {
                     String[] parts = line.split(",");
-                    if (parts[3].trim().equals(flightId) && parts[2].trim().equals(passengerId)) {
+                    if (parts.length >=5 && parts[4].trim().equals(flightId) && parts[1].trim().equals(passengerId)) {
                         System.out.println("Ticket Status: WAITING");
-                        System.out.println("Passenger Name: " + parts[1]);
-                        System.out.println("Flight Code: " + parts[3]);
+                        System.out.println("Passenger Name: " + parts[2]);
+                        System.out.println("Flight Code: " + parts[4]);
                         ticketFound = true;
                         break;
                     }
