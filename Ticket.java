@@ -4,6 +4,11 @@
  */
 package flightds;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  *
@@ -11,17 +16,17 @@ package flightds;
  * this class has all details about the ticket  
  */
 
- public class Ticket {
+public class Ticket {
     
     private String ticketId;
-    private static int ticketCount = 1000; // start count 1000
     private Passenger passenger;    // passenger obj
     private TicketStatus status;    // ticket status obj
     private Flight flight;          // flight obj
 
     // constructor
     public Ticket(Passenger passenger, TicketStatus status, Flight flight) {
-        this.ticketId = "T" + (ticketCount++);  // simple id
+        String timeStamp = new SimpleDateFormat("mmss").format(new Date());
+        this.ticketId = "T" + flight.getFlightCode()+ "_"+timeStamp;   // simple id
         this.passenger = passenger;
         this.status = status;
         this.flight = flight;
@@ -47,6 +52,10 @@ package flightds;
     //set status
     public void setStatus(TicketStatus status) {
         this.status = status;
+    }
+
+    public void setTicketId(String ticketId) {
+        this.ticketId = ticketId;
     }
 
     @Override
