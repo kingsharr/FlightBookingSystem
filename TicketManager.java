@@ -20,17 +20,20 @@ public class TicketManager {
     }
 
     public void cancelTicket(String flightId, String passengerId) {
+        ticketSystem.loadFlightData("flightds/FlightData.csv", false);
         try {
 
             Flight flightCancel = null;
             for (Flight flight : ticketSystem.getFlights()) {
-                if (flight.getFlightCode().equals(flightId)) {
+                
+                if (flight.getFlightCode().trim().equalsIgnoreCase(flightId.trim())) {
                     flightCancel = flight;
                     break;
                 }
             }
 
             if (flightCancel == null) {
+                System.out.println("Flight ID CANCEL : " + flightId);   //debug
                 System.out.println("Flight not found: " + flightId);
                 return;
             }
@@ -41,6 +44,7 @@ public class TicketManager {
             // if removed from confirmed, process waiting list
             if (removedFromConfirmed) {
                 //update seats
+                
                 int availableSeats = flightCancel.getAvailableSeats()+1;
                 flightCancel.saveSeatsData(flightId, availableSeats);
                 processWaitingList(flightId);   // check in waiting list to add
@@ -51,7 +55,7 @@ public class TicketManager {
                 
                 if (removedFromWaiting) {
                    
-                    processWaitingList(flightId);   // add the next person in waiting list 
+                    //processWaitingList(flightId);   // add the next person in waiting list 
                     System.out.println("Ticket removed from waiting list.");
                 } else {
                     System.out.println("No ticket found for Passenger ID " + passengerId + " on Flight " + flightId);
@@ -115,7 +119,7 @@ public class TicketManager {
                 String[] parts = line.split(",\\s*");
                 
                 // Check if ticket matches flight and passenger
-                if (parts.length >=5 && parts[3].trim().equals(flightId) && parts[1].trim().equals(passengerId)) {
+                if (parts.length >=5 && parts[3].trim().equals(flightId) && parts[2].trim().equals(passengerId)) {
                     ticketRemoved = true;
                     System.out.println("Ticket removed from waiting list: " + line);
                 } else {
@@ -150,6 +154,7 @@ public class TicketManager {
         }
 
         if (flight == null) {
+           
             System.out.println("Flight not found: " + flightId);
             return;
         }
