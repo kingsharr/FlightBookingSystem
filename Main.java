@@ -19,8 +19,11 @@ public class Main {
 
     // display selected flight
     public static Flight selectFlight(List<Flight> flights, String flightCode) {
+        
         for (Flight flight : flights) {
-            if (flight.getFlightCode().equalsIgnoreCase(flightCode)){
+            
+            if (flight.getFlightCode().trim().equalsIgnoreCase(flightCode)){
+                
                 return flight;
             }
         }
@@ -33,7 +36,8 @@ public class Main {
         System.out.println("3.  Book Flight Ticket");
         System.out.println("4.  Cancel Ticket");
         System.out.println("5.  View Ticket Status");
-        System.out.println("6.  Exit ");
+        System.out.println("6.  Edit Ticket Information ");
+        System.out.println("7.  Exit ");
         System.out.println("Select an option: ");
     }
 
@@ -42,10 +46,11 @@ public class Main {
         Scanner scanner = new Scanner(System.in);
 
         FlightTicketSystem ticketSystem = new FlightTicketSystem();
+        TicketManager ticketManager = new TicketManager(ticketSystem);
         String weekStartDate = null;
-        List<Flight> availableFlights = null;
         
-        // start system until user select 6
+        
+        // start system until user select 7
         System.out.println("~~~~~~~~ Welcome To XYZ Flight Ticket System ~~~~~~~~");
 
         while (true) {
@@ -98,7 +103,7 @@ public class Main {
 
                     // User selects a flight
                     System.out.println("\nEnter a flight code to book a ticket:");
-                    String flightCode = scanner.nextLine();
+                    String flightCode = scanner.nextLine().trim();
 
                     // select the flight
                     Flight selectedFlight = selectFlight(ticketSystem.getFlights(), flightCode);
@@ -128,16 +133,36 @@ public class Main {
 
                 case 4:     // cancel ticket
                     
-                    System.out.println("Cancel my ticket");
+                    System.out.print("Enter Flight ID: ");
+                    String flightId = scanner.nextLine();
+                    System.out.print("Enter Passenger ID to cancel: ");
+                    String passengerId = scanner.nextLine();
+                    
+                    ticketManager.cancelTicket(flightId, passengerId);
+                    
                     break;
                 
                 case 5:     // view ticket stats 
+
+                    System.out.println("Enter Flight ID:");
+                    String flightIdToView = scanner.nextLine();
+                    System.out.println("Enter Passenger ID:");
+                    String passengerIdToView = scanner.nextLine();
+
+                    ticketManager.viewTicketStatus(flightIdToView, passengerIdToView);
                     
-                    System.out.println("View Ticket Status");
+                    break;
+                
+                case 6: // edit ticket information
+
+                    System.out.println("Enter Ticket ID to edit:");
+                    String ticketIdToEdit = scanner.nextLine();
+
+                    ticketManager.editTicket(ticketIdToEdit, scanner);
 
                     break;
 
-                case 6: 
+                case 7: 
                     //exit
                     System.out.println("Exiting system... \nThank you for using XYZ Flight Booking System");
                     scanner.close();
