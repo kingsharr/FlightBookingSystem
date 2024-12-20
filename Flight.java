@@ -4,6 +4,8 @@
  */
 package flightds;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -49,12 +51,23 @@ public class Flight {
         return availableSeats;
     }
 
+    public List<Ticket> getBookedTickets() {
+        return bookedTickets;
+    }
+
+    public List<Ticket> getWaitingList() {
+        return waitingList.getQueue();
+    }
+
     // method to book ticket 
     public Ticket bookTicket(Ticket ticket) {
         if (availableSeats > 0) {
             bookedTickets.add(ticket);  //add passenger to confirmed list
             availableSeats--;   // reduce seat num
             ticket.setStatus(TicketStatus.CONFIRMED);
+
+            // save to confirmed tickets CSV
+            saveConfirmedTicketToCSV(ticket);
 
             // update to csv
             saveSeatsData(flightCode, availableSeats);
@@ -64,69 +77,15 @@ public class Flight {
             ticket.setStatus(TicketStatus.WAITING);
 
             // no vacany add passenger to waiting list
-            //waitingList.enqueue(ticket); 
+            
             // load waiting list csv 
-            queueStore.loadFromCSV("flightds/waitinglist.csv");
+            //queueStore.loadFromCSV("flightds/waitinglist.csv");
             queueStore.enqueueSave(ticket, "flightds/waitinglist.csv");
 
             return ticket;
         }
 
         
-    }
-
-    // method to cancel ticket 
-    public void cancelTicket(String ticketId) {
-        Ticket ticketToCancel = null;
-
-        // loop through the tickets to find id
-        for (int i=0; i< bookedTickets.size(); i++) {
-            Ticket ticket = bookedTickets.get(i);
-
-            if (ticket.getTicketId().equals(ticketId)) { // compare strings
-                ticketToCancel = ticket;
-                bookedTickets.remove(i);   // remove the ticket
-                availableSeats++;   // increase seat by 1
-                System.out.println("Ticket ID " + ticketId + " has been canceled successfully");
-                
-                // pass next passenger from waiting list to confirmed
-                if (!waitingList.isEmpty()) {   // check if got anyone waiting
-                    Ticket nextInLine = waitingList.dequeue();
-                    bookedTickets.add(nextInLine);  // add them to booked
-                    availableSeats--;
-
-                    nextInLine.setStatus(TicketStatus.CONFIRMED);
-                    System.out.println("Passenger in waiting list has been confirmed"); 
-                    // TO-DO: include waiting list passenger name here as confirmed
-                }
-
-                return;
-            }
-
-            
-        }
-
-        // if no ticket id found
-        if (ticketToCancel == null) {
-            System.out.println("Ticket ID " + ticketId + " not found. Try again.");
-        }
-    }
-
-    // method to view ticket status based on passenger id
-    public String viewStatus(Passenger passenger) {
-        
-        // loop through to find ticket id
-        for (int i=0; i<bookedTickets.size(); i++) {
-            Ticket ticket = bookedTickets.get(i);
-
-            // show status for passenger
-            if (ticket.getPassenger().equals(passenger)) {
-                return ticket.getStatus().toString();
-            }
-        }
-
-        // else 
-        return "No ticket found for Passenger: " + passenger.getName();
     }
 
     // update available seats info realtime
@@ -155,6 +114,28 @@ public class Flight {
             System.out.println("Error saving new flight data !!");
         }
         
+    }
+
+    // save confirmed bookings
+    private void saveConfirmedTicketToCSV(Ticket ticket) {
+        try (FileWriter fileWriter = new FileWriter("flightds/ConfirmedTickets.csv", true)) {
+            
+            File file = new File("flightds/ConfirmedTickets.csv");
+            
+            if (file.length() == 0) {   // if empty add header
+                fileWriter.append("TicketID,PassengerName,PassengerID,FlightCode,FlightDate\n");
+            }
+            
+            // Append ticket details
+            fileWriter.append(String.format("%s,%s,%s,%s,%s\n", 
+                ticket.getTicketId(), 
+                ticket.getPassenger().getName(), 
+                ticket.getPassenger().getPassportNum(),
+                this.flightCode,
+                this.flightDate));
+        } catch (IOException e) {
+            System.out.println("Error saving confirmed ticket: " + e.getMessage());
+        }
     }
 
     @Override
