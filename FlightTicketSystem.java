@@ -5,8 +5,11 @@
 package flightds;
 
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -23,8 +26,8 @@ import java.util.Scanner;
 public class FlightTicketSystem {
 
     private List<Flight> flights = new ArrayList<>(); // store found flights based on user search
-
-    private HashMap<String, Passenger> registeredPassenger = new HashMap<>(); // store passenger detail
+    private HashMap<String, Ticket> allBookings = new HashMap<>(); // Storing all tickets by Ticket ID
+    private HashMap<String, Passenger> registeredPassenger = new HashMap<>(); //store passenger id details
 
     public List<Flight> getFlights() {
         return this.flights;
@@ -118,11 +121,11 @@ public class FlightTicketSystem {
 
         // check for passenger id
         if (registeredPassenger.containsKey(passengerId)) {
-            System.out.println("Invalid Passenger ID");
+            System.out.println("Passport ID already registered");
             return;
         }
         
-        // check if contains
+        // find flgiht
         for (Flight userFlight : flights) {
             if (userFlight.getFlightCode().equals(flightId)) { // yes contains
                 flight = userFlight;
@@ -140,8 +143,9 @@ public class FlightTicketSystem {
         Ticket ticket = new Ticket(passenger, TicketStatus.WAITING, flight);    // set default as waiting first
         Ticket bookedTicket = flight.bookTicket(ticket);
 
-        // check passenger id before processing
+        // Store passenger and ticket
         registeredPassenger.put(passengerId, passenger);
+        allBookings.put(bookedTicket.getTicketId(), bookedTicket);
 
         if (bookedTicket.getStatus() == TicketStatus.CONFIRMED) {
             System.out.println("Ticket booked successfully: " + bookedTicket); // get Ticket info print
@@ -151,49 +155,71 @@ public class FlightTicketSystem {
     
     }
 
+    /* 
     // cancel ticket
-    public void cancelTicket(String week, String flightId, String ticketId) {
-        Flight flight = null;
+    public void cancelTicket(String ticketId) {
         
         // check if contains
-        for (Flight userFlight : flights) {
-            if (userFlight.getFlightCode().equals(flightId)) { // yes contains
-                flight = userFlight;
-                break;
-            }
+        for (Flight flight : flights) {
+            flight.cancelTicket(ticketId);
         }
-        // not found for id
-        if (flight == null) {
-            System.out.println("No flight found with ID: " + flightId);
-            return;
-        }
-
-        // successfull cancel
-        flight.cancelTicket(ticketId);
-        System.out.println("Ticket ID " + ticketId + " has been canceled.");
+        
     }
 
     // check ticket status 
-    public void viewTicketStatus(String flightId, Passenger passenger) {
-        Flight flight = null;
+    public void viewTicketStatus(String ticketId) {
         
-        // check if contains
-        for (Flight userFlight : flights) {
-            if (userFlight.getFlightCode().equals(flightId)) { // yes contains
-                flight = userFlight;
+        boolean ticketFound = false;
+
+        for (Flight flight: flights) {
+            String status = flight.viewStatus(ticketId);
+            
+            if (!status.equals("Ticket not found")) {
+                System.out.println("\n****** Searching Ticket ID: " + ticketId + " ******");
+                System.out.println("Status: " + status);
+                ticketFound = true;
                 break;
             }
-        }
-        // not found for id
-        if (flight == null) {
-            System.out.println("No flight found with ID: " + flightId);
-            return;
+
         }
 
 
-        // successful
-        String status = flight.viewStatus(passenger);
-        System.out.println("Ticket status for Passenger " + passenger.getName() + ": " + status);
+        if (!ticketFound) {
+            System.out.println("Ticket id " + ticketId + " not found");
+        }
+        
+
+    }
+*/
+    // Optional method to check Confirmed Tickets CSV
+    private void checkConfirmedTicketsCSV(String ticketId) {
+        try (BufferedReader reader = new BufferedReader(new FileReader("ConfirmedTickets.csv"))) {
+            String line;
+            boolean found = false;
+            
+            // Skip header
+            reader.readLine();
+            
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts[0].trim().equals(ticketId)) {
+                    System.out.println("\n===== Historical Ticket Record =====");
+                    System.out.println("Ticket ID found in past confirmed tickets");
+                    System.out.println("Passenger: " + parts[1]);
+                    System.out.println("Flight Code: " + parts[3]);
+                    System.out.println("Note: This ticket may have been processed previously");
+                    System.out.println("===============================");
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                System.out.println("\nNo historical ticket records found.");
+            }
+        } catch (IOException e) {
+            System.out.println("Error checking confirmed tickets CSV: " + e.getMessage());
+        }
     }
 
 }
