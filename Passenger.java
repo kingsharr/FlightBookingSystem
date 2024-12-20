@@ -14,12 +14,12 @@ package flightds;
 public class Passenger {
     
     private String name;
-    private String passengerId;
+    private String passportNum;;
 
     // constructor
-    public Passenger(String name, String passengerId) {
+    public Passenger(String name, String passportNum) {
         this.name = name;
-        this.passengerId = passengerId;
+        this.passportNum = passportNum;
     }
 
     //getters 
@@ -27,8 +27,8 @@ public class Passenger {
         return name;
     }
 
-    public String getPassengerId() {
-        return passengerId;
+    public String getPassportNum() {
+        return passportNum;
     }
 
     //settters
@@ -36,12 +36,12 @@ public class Passenger {
         this.name = name;
     }
 
-    public void setPassengerId(String passengerId) {
-        this.passengerId = passengerId;
+    public void setPassportNum(String passportNum) {
+        this.passportNum = passportNum;
     }
 
     @Override
     public String toString() {
-        return "Passenger Name: " + name + ", ID: " + passengerId;
+        return "Passenger Name: " + name + ", ID: " + passportNum;
     }
 }
